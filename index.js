@@ -12,13 +12,16 @@ class WebSocketClientReconnect extends EventEmiiter {
 			reconnect_timeinterval: 1e3,
 			...options
 		};
-	
-		this._reconnect = this.options.reconnect;
+		
+		this._reconnect = null;
+		this._tid = null;
 		
 		this._socketNew();
 	}
 
 	_socketNew() {
+		this._reconnect = this.options.reconnect;
+		
 		this.socket = new WebSocketClient(this.url, {...this.options});
 		this.socket.once("open", (...args) => this.emit("open", ...args));
 		this.socket.once("close", (...args) => this.emit("close", ...args));
@@ -26,7 +29,7 @@ class WebSocketClientReconnect extends EventEmiiter {
 		this.socket.on("message", (...args) => this.emit("message", ...args));
 		
 		this.socket.once("close", () => {
-			setTimeout(() => {
+			this.tid = setTimeout(() => {
 				if ( !this._reconnect ) {return;}
 				
 				this.emit("reconnect");
@@ -44,6 +47,28 @@ class WebSocketClientReconnect extends EventEmiiter {
 		if ( !this.isClosed() ) {
 			this.socket.close();
 		}
+	}
+	open() {
+		if ( !this.isClosed() ) {
+			throw new Error("Socket already opened");
+		}
+		
+		(this.tid !== null) && clearTimeout(this.tid);
+		this.tid = null;
+			
+		this._socketNew();
+	}
+
+	reconnect() {
+		if ( this.isClosed() ) {
+			throw new Error("Socket already closed");
+		}
+		
+		this.socket.once("close", () => {
+			this.open();
+		});
+		
+		this.socket.close();
 	}
 }
 
