@@ -12,16 +12,14 @@ class WebSocketClientReconnect extends EventEmiiter {
 			reconnect_timeinterval: 1e3,
 			...options
 		};
-		
-		this._reconnect = null;
+
+		this._reconnect = this.options.reconnect;
 		this._tid = null;
 		
 		this._socketNew();
 	}
 
 	_socketNew() {
-		this._reconnect = this.options.reconnect;
-		
 		this.socket = new WebSocketClient(this.url, {...this.options});
 		this.socket.once("open", (...args) => this.emit("open", ...args));
 		this.socket.once("close", (...args) => this.emit("close", ...args));
@@ -29,10 +27,10 @@ class WebSocketClientReconnect extends EventEmiiter {
 		this.socket.on("message", (...args) => this.emit("message", ...args));
 		
 		this.socket.once("close", () => {
-			this.tid = setTimeout(() => {
+			this._tid = setTimeout(() => {
 				if ( !this._reconnect ) {return;}
 				
-				this.emit("reconnect");
+				this.emit("reopen");
 				this._socketNew();
 			}, this.options.reconnect_timeinterval);
 		});
@@ -41,34 +39,21 @@ class WebSocketClientReconnect extends EventEmiiter {
 	isOpened(...args) {return this.socket.isOpened(...args);}
 	isClosed(...args) {return this.socket.isClosed(...args);}
 	send(...args) {return this.socket.send(...args);}
+
 	close() {
 		this._reconnect = false;
-		
-		if ( !this.isClosed() ) {
-			this.socket.close();
-		}
-	}
-	open() {
-		if ( !this.isClosed() ) {
-			throw new Error("Socket already opened");
-		}
-		
-		(this.tid !== null) && clearTimeout(this.tid);
-		this.tid = null;
-			
-		this._socketNew();
+		(!this.isClosed()) && this.socket.close();
 	}
 
-	reconnect() {
-		if ( this.isClosed() ) {
-			throw new Error("Socket already closed");
-		}
+	reopen() {
+		(!this.isClosed()) && this.socket.close();
+
+		(this._tid !== null) && clearTimeout(this._tid);
+		this._tid = null;
 		
-		this.socket.once("close", () => {
-			this.open();
-		});
+		this.emit("reopen");
 		
-		this.socket.close();
+		this._socketNew();
 	}
 }
 
