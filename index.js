@@ -55,6 +55,9 @@ class WebSocketClientReconnect extends EventEmiiter {
 		
 		this._socketNew();
 	}
+	reconnect() {
+		return this.reopen();
+	}
 }
 
 module.exports = WebSocketClientReconnect;
